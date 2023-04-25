@@ -1,33 +1,64 @@
-#include <chrono>
-#include <fstream>
 #include <iostream>
 
-#include <date/date.h>
-#include <nlohmann/json.hpp>
+#include "rapidjson/reader.h"
+#include "rapidjson/filereadstream.h"
+
+#include <boost/date_time/gregorian/gregorian.hpp>
 
 #include "internship.h"
+#include "jsonHandler.h"
 
-using json = nlohmann::json;
-using namespace date;
+using namespace rapidjson;
 
 namespace internship {
-    // remove this function before submitting your solution
-    void example(const std::string& jsonFileName) {
-        std::ifstream f(jsonFileName);
-        json data = json::parse(f);
+    bool compare_support_period(const osCycleSupportItem& osElement1, const osCycleSupportItem& osElement2) {
+        return std::get<2>(osElement1) > std::get<2>(osElement2);
+    }
 
-        std::cout << "Dynatrace Gdansk Summer Internship 2023\n"
-                    << "UTC time now: " << std::chrono::system_clock::now() << "\n\n";
+    int days_between_dates(const std::string& releaseDate, const std::string& eolDate) {
+        try {
+            // creating dates from string
+            auto dateStart = boost::gregorian::from_string(releaseDate);
+            auto dateEnd = boost::gregorian::from_string(eolDate);
 
-        for(const auto& [id, product] : data.items()) {
-            std::cout << "Product name: " << product["name"] << "\n";
+            // calculating the dates difference
+            auto dateDiff = dateEnd - dateStart;
+
+            return dateDiff.days() + 1;
+        } catch (const std::exception& e) {
+            // std::cerr << "Failed to calculate: releaseDate="  << releaseDate << ", eolDate=" << eolDate << std::endl;
+            return -1;
         }
     }
 
-    // do not remove this function
-    void solution(const std::string& jsonFileName, int elementsCount) {
-        example(jsonFileName); // remove this call before submitting your solution
+    void extract_os_longest_support(const std::string& jsonFileName, int elementsCount) {
+        if (elementsCount < 1) {
+            return;
+        }
 
-        // put the call to your solution here
+        FILE* file = fopen(jsonFileName.c_str(), "r");
+        if  (!file) {
+            std::cerr << "Failed to open file: " << jsonFileName << std::endl;
+            exit(1);
+        }
+
+        // setting buffer to 64KB, by default rapidJSON's buffor is 4KB
+        char buffer[65536];
+
+        // reading from the input file
+        FileReadStream is(file, buffer, sizeof(buffer));
+
+        // parsing the JSON data from the stream
+        JsonHandler jsonHandler;
+        Reader reader;
+        reader.Parse(is, jsonHandler);
+
+        // sorting and displaying the first [elementsCount] operating systems
+        jsonHandler.sort_longest_support_os();
+        jsonHandler.display_longest_support_os(elementsCount);
+    }
+
+    void solution(const std::string& jsonFileName, int elementsCount) {
+        extract_os_longest_support(jsonFileName, elementsCount);
     }
 }
